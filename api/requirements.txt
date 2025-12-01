@@ -6,3 +6,5 @@ gunicorn
 waitress
 google-generativeai
 python-dotenv
+grpcio
+grpcio-status
