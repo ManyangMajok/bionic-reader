@@ -1,0 +1,8 @@
+Flask
+PyMuPDF
+WeasyPrint
+flask-cors
+gunicorn
+waitress
+google-generativeai
+python-dotenv
