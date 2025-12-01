@@ -1,17 +1,29 @@
 import axios from "axios";
 
-// --- Existing Functions ---
+// CONFIGURATION
+// Development: Use localhost
+// Production: Use relative path (Vercel will proxy to Render via vercel.json)
+const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
+
+// Create an axios instance for cleaner calls
+const apiClient = axios.create({
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  // INCREASED TIMEOUT: Render free tier takes ~50-60s to wake up.
+  timeout: 120000, 
+});
 
 export const extractTextFromPDFPython = async (file: File): Promise<string> => {
   try {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await axios.post("/api/extract-pdf", formData, {
+    const response = await apiClient.post("/api/extract-pdf", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      timeout: 30000, // 30 second timeout
     });
 
     if (!response.data.text || !response.data.text.trim()) {
@@ -22,9 +34,9 @@ export const extractTextFromPDFPython = async (file: File): Promise<string> => {
   } catch (error) {
     console.error("Error extracting PDF text with Python backend:", error);
     if (axios.isAxiosError(error)) {
-      if (error.code === "ECONNREFUSED") {
+      if (error.code === "ECONNREFUSED" || error.code === "ERR_NETWORK") {
         throw new Error(
-          "Python backend is not running. Please start the backend server.",
+          "Backend server is unreachable. If you are on the live site, the free server might be waking up (wait 30s). If local, ensure python app.py is running.",
         );
       } else if (error.response?.status === 413) {
         throw new Error("File is too large. Please try a smaller PDF file.");
@@ -35,7 +47,7 @@ export const extractTextFromPDFPython = async (file: File): Promise<string> => {
       }
     }
     throw new Error(
-      `Failed to extract text from PDF file: ${
+      `Failed to extract text: ${
         error instanceof Error ? error.message : "Unknown error"
       }`,
     );
@@ -48,7 +60,7 @@ export const generatePdfPython = async (
   boldIntensity: number,
 ) => {
   try {
-    const response = await axios.post(
+    const response = await apiClient.post(
       "/api/generate-pdf",
       {
         text: text,
@@ -57,7 +69,6 @@ export const generatePdfPython = async (
       },
       {
         responseType: "blob",
-        timeout: 30000,
       },
     );
 
@@ -71,25 +82,14 @@ export const generatePdfPython = async (
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (error) {
-    console.error("Error generating PDF with Python backend:", error);
-    if (axios.isAxiosError(error) && error.code === "ECONNREFUSED") {
-      throw new Error(
-        "Python backend is not running. Falling back to DOCX download.",
-      );
-    }
-    throw new Error(
-      `There was an error generating the PDF file: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`,
-    );
+    console.error("Error generating PDF:", error);
+    throw new Error("Failed to generate PDF.");
   }
 };
 
-// --- NEW AI FUNCTIONS ---
-
 export const summarizeText = async (text: string) => {
   try {
-    const response = await axios.post("/api/summarize", { text });
+    const response = await apiClient.post("/api/summarize", { text });
     return response.data; // Returns { summary: "..." }
   } catch (error) {
     console.error("Summarization failed", error);
@@ -99,7 +99,7 @@ export const summarizeText = async (text: string) => {
 
 export const generateSpeech = async (text: string) => {
   try {
-    const response = await axios.post(
+    const response = await apiClient.post(
       "/api/generate-speech",
       { text },
       { responseType: "blob" } // Important for audio
@@ -113,7 +113,7 @@ export const generateSpeech = async (text: string) => {
 
 export const chatWithDocument = async (context: string, question: string) => {
   try {
-    const response = await axios.post("/api/chat", { context, question });
+    const response = await apiClient.post("/api/chat", { context, question });
     return response.data; // Returns { answer: "..." }
   } catch (error) {
     console.error("Chat failed", error);
@@ -123,7 +123,7 @@ export const chatWithDocument = async (context: string, question: string) => {
 
 export const generateMindMap = async (text: string) => {
   try {
-    const response = await axios.post("/api/generate-mindmap", { text });
+    const response = await apiClient.post("/api/generate-mindmap", { text });
     return response.data; // Returns { mermaidCode: "graph TD..." }
   } catch (error) {
     console.error("Mind map generation failed", error);
